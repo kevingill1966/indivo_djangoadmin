@@ -31,7 +31,7 @@ admin.site.register(Account, AccountAdmin)
 class RecordAdmin(admin.ModelAdmin):
     list_display = ('label', 'external_id')
     search_fields = ('label',)
-    readonly_fields = 'show_demographics_url',
+    readonly_fields = 'show_demographics_url', 'id'
     exclude='demographics',
 
     def show_demographics_url(self, obj):
@@ -79,8 +79,25 @@ class DocumentAdmin(admin.ModelAdmin):
 admin.site.register(Document, DocumentAdmin)
 #-------------------------------------------------------------------------
 class StatusAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name')
+    list_display = ('name', 'id')
 admin.site.register(StatusName, StatusAdmin)
+#-------------------------------------------------------------------------
+class DocumentSchemaAdmin(admin.ModelAdmin):
+    list_display = ('type', 'id')
+    readonly_fields = 'id',
+admin.site.register(DocumentSchema, DocumentSchemaAdmin)
+#-------------------------------------------------------------------------
+# This is configured via a django management command. Prevent editing via admin.
+class PHAAdmin(admin.ModelAdmin):
+    list_display = ('description', 'type', 'email', 'author')
+    readonly_fields = ('id', 'creator', 'email', 'type', 'consumer_key', 'secret', 'name', 'description', 'author',
+            'version', 'indivo_version', 'callback_url', 'start_url_template', 'is_autonomous', 'autonomous_reason',
+            'has_ui', 'frameable', 'icon_url', 'requirements')
+    def has_add_permission(self, request):
+        return False
+    def has_delete_permission(self, request, obj=None):
+        return False
+admin.site.register(PHA, PHAAdmin)
 #--[ non-customised models ]----------------------------------------------
 admin.site.register(AccessToken)
 admin.site.register(AccountAuthSystem)
@@ -95,7 +112,6 @@ admin.site.register(CarenetAutoshare)
 admin.site.register(CarenetDocument)
 admin.site.register(CarenetPHA)
 admin.site.register(DocumentRels)
-admin.site.register(DocumentSchema)
 admin.site.register(DocumentStatusHistory)
 admin.site.register(Encounter)
 admin.site.register(Equipment)
@@ -111,7 +127,6 @@ admin.site.register(MessageAttachment)
 admin.site.register(Nonce)
 admin.site.register(Notification)
 admin.site.register(NoUser)
-admin.site.register(PHA)
 admin.site.register(PHAShare)
 admin.site.register(Principal)
 admin.site.register(Problem)
