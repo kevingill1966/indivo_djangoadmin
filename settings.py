@@ -105,6 +105,9 @@ INSTALLED_APPS = (
     'django.contrib.admindocs',
     'indivo_server_admin',
     'indivo',
+    'codingsystems',
+    'admin_enhancer',
+    'south',
 )
 
 # A sample logging configuration. The only tangible logging

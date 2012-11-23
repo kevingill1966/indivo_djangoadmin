@@ -2,11 +2,18 @@ from django.contrib import admin
 from django.core import urlresolvers
 from django import forms
 
-from indivo_server.indivo.models import *
+from admin_enhancer.admin import EnhancedModelAdminMixin
+
+from indivo_server.indivo import models as indivo_models
+from indivo_server.codingsystems import models as coding_models
 
 DEVELOPMENT_MODE = True
+
+# This puts links on foreignkey fields
+class DefaultModelAdmin(EnhancedModelAdminMixin, admin.ModelAdmin):
+    pass
 #-------------------------------------------------------------------------
-class AccountAdmin(admin.ModelAdmin):
+class AccountAdmin(DefaultModelAdmin):
     """
         This is the account (i.e. login). I would like to use this to 
         link to other related fields.
@@ -26,9 +33,9 @@ class AccountAdmin(admin.ModelAdmin):
     list_display = ('full_name', 'contact_email', 'state')
     search_fields = ('full_name', 'contact_email')
 
-admin.site.register(Account, AccountAdmin)
+admin.site.register(indivo_models.Account, AccountAdmin)
 #-------------------------------------------------------------------------
-class RecordAdmin(admin.ModelAdmin):
+class RecordAdmin(DefaultModelAdmin):
     list_display = ('label', 'external_id')
     search_fields = ('label',)
     readonly_fields = 'show_demographics_url', 'id'
@@ -41,9 +48,9 @@ class RecordAdmin(admin.ModelAdmin):
     show_demographics_url.allow_tags = True
     show_demographics_url.short_description = 'Demographics'
 
-admin.site.register(Record, RecordAdmin)
+admin.site.register(indivo_models.Record, RecordAdmin)
 #-------------------------------------------------------------------------
-class DemographicsAdmin(admin.ModelAdmin):
+class DemographicsAdmin(DefaultModelAdmin):
     list_display = ('name_given', 'name_middle', 'name_family', 'bday', 'adr_city', 'tel_2_number')
     search_fields = ('name_family', 'name_given',  'name_middle')
     exclude='document',
@@ -56,7 +63,7 @@ class DemographicsAdmin(admin.ModelAdmin):
     document_url.allow_tags = True
     document_url.short_description = 'Document'
 
-admin.site.register(Demographics, DemographicsAdmin)
+admin.site.register(indivo_models.Demographics, DemographicsAdmin)
 
 #-------------------------------------------------------------------------
 
@@ -65,30 +72,30 @@ class StatusField(forms.ModelChoiceField):
           return obj.name
 
 class DocumentAdminForm(forms.ModelForm):
-    status = StatusField(queryset=StatusName.objects.all()) 
+    status = StatusField(queryset=indivo_models.StatusName.objects.all()) 
     class Meta:
-          model = Document
+          model = indivo_models.Document
 
-class DocumentAdmin(admin.ModelAdmin):
+class DocumentAdmin(DefaultModelAdmin):
     list_display = ('id', 'fqn', 'status_name')
     form = DocumentAdminForm
 
     def status_name(self, obj):
         return obj.status.name
     status_name.short_description = 'Status'
-admin.site.register(Document, DocumentAdmin)
+admin.site.register(indivo_models.Document, DocumentAdmin)
 #-------------------------------------------------------------------------
-class StatusAdmin(admin.ModelAdmin):
+class StatusAdmin(DefaultModelAdmin):
     list_display = ('name', 'id')
-admin.site.register(StatusName, StatusAdmin)
+admin.site.register(indivo_models.StatusName, StatusAdmin)
 #-------------------------------------------------------------------------
-class DocumentSchemaAdmin(admin.ModelAdmin):
+class DocumentSchemaAdmin(DefaultModelAdmin):
     list_display = ('type', 'id')
     readonly_fields = 'id',
-admin.site.register(DocumentSchema, DocumentSchemaAdmin)
+admin.site.register(indivo_models.DocumentSchema, DocumentSchemaAdmin)
 #-------------------------------------------------------------------------
 # This is configured via a django management command. Prevent editing via admin.
-class PHAAdmin(admin.ModelAdmin):
+class PHAAdmin(DefaultModelAdmin):
     list_display = ('description', 'type', 'email', 'author')
     readonly_fields = ('id', 'creator', 'email', 'type', 'consumer_key', 'secret', 'name', 'description', 'author',
             'version', 'indivo_version', 'callback_url', 'start_url_template', 'is_autonomous', 'autonomous_reason',
@@ -97,43 +104,103 @@ class PHAAdmin(admin.ModelAdmin):
         return False
     def has_delete_permission(self, request, obj=None):
         return False
-admin.site.register(PHA, PHAAdmin)
+admin.site.register(indivo_models.PHA, PHAAdmin)
+#-------------------------------------------------------------------------
+class AuditAdmin(DefaultModelAdmin):
+    # TODO: Record ID is not linked
+    list_display = ('view_func', 'pha_id', 'datetime', 'effective_principal_email', 'record_id', 'document_id')
+    list_filter = ('view_func', 'pha_id', 'record_id')
+    exclude = ('record_id', 'document_id')
+
+    readonly_fields = ('record_id_url', 'document_id_url',
+        'datetime', 'view_func', 'request_successful', 'effective_principal_email', 'proxied_by_email',
+        'carenet_id', 'pha_id', 'external_id', 'message_id', 'req_url', 'req_ip_address',
+        'req_domain', 'req_headers', 'req_method', 'resp_code', 'resp_headers',)
+
+    def record_id_url(self, obj):
+        if obj.record_id:
+            url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record_id,))
+            return '<a href="%s">%s</a>' % (url, obj.record_id)
+        else:
+            "no record"
+    record_id_url.allow_tags = True
+    record_id_url.short_description = 'Record'
+
+    def document_id_url(self, obj):
+        if obj.document_id:
+            url = urlresolvers.reverse('admin:indivo_document_change', args=(obj.document_id,))
+            return '<a href="%s">%s</a>' % (url, obj.document_id)
+        else:
+            "no document"
+    document_id_url.allow_tags = True
+    document_id_url.short_description = 'Document'
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+admin.site.register(indivo_models.Audit, AuditAdmin)
+
 #--[ non-customised models ]----------------------------------------------
-admin.site.register(AccessToken)
-admin.site.register(AccountAuthSystem)
-admin.site.register(AccountFullShare)
-admin.site.register(Audit)
-admin.site.register(Allergy)
-admin.site.register(AllergyExclusion)
-admin.site.register(AuthSystem)
-admin.site.register(Carenet)
-admin.site.register(CarenetAccount)
-admin.site.register(CarenetAutoshare)
-admin.site.register(CarenetDocument)
-admin.site.register(CarenetPHA)
-admin.site.register(DocumentRels)
-admin.site.register(DocumentStatusHistory)
-admin.site.register(Encounter)
-admin.site.register(Equipment)
-admin.site.register(Fact)
-admin.site.register(Fill)
-admin.site.register(Immunization)
-admin.site.register(LabResult)
-admin.site.register(MachineApp)
-admin.site.register(Measurement)
-admin.site.register(Medication)
-admin.site.register(Message)
-admin.site.register(MessageAttachment)
-admin.site.register(Nonce)
-admin.site.register(Notification)
-admin.site.register(NoUser)
-admin.site.register(PHAShare)
-admin.site.register(Principal)
-admin.site.register(Problem)
-admin.site.register(Procedure)
-admin.site.register(RecordNotificationRoute)
-admin.site.register(ReqToken)
-admin.site.register(SessionRequestToken)
-admin.site.register(SessionToken)
-admin.site.register(SimpleClinicalNote)
-admin.site.register(VitalSigns)
+admin.site.register(indivo_models.AccessToken, DefaultModelAdmin)
+admin.site.register(indivo_models.AccountAuthSystem, DefaultModelAdmin)
+admin.site.register(indivo_models.AccountFullShare, DefaultModelAdmin)
+admin.site.register(indivo_models.Allergy, DefaultModelAdmin)
+admin.site.register(indivo_models.AllergyExclusion, DefaultModelAdmin)
+admin.site.register(indivo_models.AuthSystem, DefaultModelAdmin)
+admin.site.register(indivo_models.Carenet, DefaultModelAdmin)
+admin.site.register(indivo_models.CarenetAccount, DefaultModelAdmin)
+admin.site.register(indivo_models.CarenetAutoshare, DefaultModelAdmin)
+admin.site.register(indivo_models.CarenetDocument, DefaultModelAdmin)
+admin.site.register(indivo_models.CarenetPHA, DefaultModelAdmin)
+admin.site.register(indivo_models.DocumentRels, DefaultModelAdmin)
+admin.site.register(indivo_models.DocumentStatusHistory, DefaultModelAdmin)
+admin.site.register(indivo_models.Encounter, DefaultModelAdmin)
+admin.site.register(indivo_models.Equipment, DefaultModelAdmin)
+admin.site.register(indivo_models.Fact, DefaultModelAdmin)
+admin.site.register(indivo_models.Fill, DefaultModelAdmin)
+admin.site.register(indivo_models.Immunization, DefaultModelAdmin)
+admin.site.register(indivo_models.LabResult, DefaultModelAdmin)
+admin.site.register(indivo_models.MachineApp, DefaultModelAdmin)
+admin.site.register(indivo_models.Measurement, DefaultModelAdmin)
+admin.site.register(indivo_models.Medication, DefaultModelAdmin)
+admin.site.register(indivo_models.Message, DefaultModelAdmin)
+admin.site.register(indivo_models.MessageAttachment, DefaultModelAdmin)
+admin.site.register(indivo_models.Nonce, DefaultModelAdmin)
+admin.site.register(indivo_models.Notification, DefaultModelAdmin)
+admin.site.register(indivo_models.NoUser, DefaultModelAdmin)
+admin.site.register(indivo_models.PHAShare, DefaultModelAdmin)
+admin.site.register(indivo_models.Principal, DefaultModelAdmin)
+admin.site.register(indivo_models.Problem, DefaultModelAdmin)
+admin.site.register(indivo_models.Procedure, DefaultModelAdmin)
+admin.site.register(indivo_models.RecordNotificationRoute, DefaultModelAdmin)
+admin.site.register(indivo_models.ReqToken, DefaultModelAdmin)
+admin.site.register(indivo_models.SessionRequestToken, DefaultModelAdmin)
+admin.site.register(indivo_models.SessionToken, DefaultModelAdmin)
+admin.site.register(indivo_models.SimpleClinicalNote, DefaultModelAdmin)
+admin.site.register(indivo_models.VitalSigns, DefaultModelAdmin)
+
+#--------[ Coding Systems ]--------------------------------------
+
+class CodingSystemAdmin(DefaultModelAdmin):
+    list_display = ('short_name', 'description')
+admin.site.register(coding_models.CodingSystem, CodingSystemAdmin)
+
+class SystemField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return obj.short_name
+
+
+class CodedValueAdminForm(forms.ModelForm):
+    system = SystemField(queryset=coding_models.CodingSystem.objects.all()) 
+    class Meta:
+          model = coding_models.CodedValue
+
+class CodedValueAdmin(DefaultModelAdmin):
+    def get_system_name(self, obj):
+        return obj.system.short_name
+    get_system_name.short_description = 'System'
+    list_display = ('get_system_name', 'code', 'physician_value', 'consumer_value', 'umls_code')
+    search_fields = ('code', 'abbreviation', 'physician_value', 'consumer_value', 'umls_code')
+    list_filter = ('system__short_name',)
+    form = CodedValueAdminForm
+admin.site.register(coding_models.CodedValue, CodedValueAdmin)
+
