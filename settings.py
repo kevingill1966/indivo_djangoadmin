@@ -132,3 +132,9 @@ LOGGING = {
         },
     }
 }
+
+# Add the templates to the path.
+import os.path
+import indivo_server_admin
+SA_ROOT_DIR = os.path.abspath(os.path.dirname(indivo_server_admin.__file__))
+TEMPLATE_DIRS += SA_ROOT_DIR + "/templates/",

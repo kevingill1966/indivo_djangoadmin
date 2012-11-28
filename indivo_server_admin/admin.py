@@ -12,6 +12,18 @@ DEVELOPMENT_MODE = True
 # This puts links on foreignkey fields
 class DefaultModelAdmin(EnhancedModelAdminMixin, admin.ModelAdmin):
     pass
+
+class RecordField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return "%s (%s)" % (obj.label, obj.id)
+
+class StatusField(forms.ModelChoiceField):
+     def label_from_instance(self, obj):
+          return obj.name
+
+class SystemField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return obj.short_name
 #-------------------------------------------------------------------------
 class AccountAdmin(DefaultModelAdmin):
     """
@@ -32,6 +44,9 @@ class AccountAdmin(DefaultModelAdmin):
 
     list_display = ('full_name', 'contact_email', 'state')
     search_fields = ('full_name', 'contact_email')
+
+    def sidebar(self):
+        import pdb; pdb.set_trace()
 
 admin.site.register(indivo_models.Account, AccountAdmin)
 #-------------------------------------------------------------------------
@@ -67,22 +82,34 @@ admin.site.register(indivo_models.Demographics, DemographicsAdmin)
 
 #-------------------------------------------------------------------------
 
-class StatusField(forms.ModelChoiceField):
-     def label_from_instance(self, obj):
-          return obj.name
-
 class DocumentAdminForm(forms.ModelForm):
     status = StatusField(queryset=indivo_models.StatusName.objects.all()) 
+    record = RecordField(queryset=indivo_models.Record.objects.all()) 
     class Meta:
           model = indivo_models.Document
 
 class DocumentAdmin(DefaultModelAdmin):
     list_display = ('id', 'fqn', 'status_name')
+    readonly_fields = 'id',
     form = DocumentAdminForm
 
     def status_name(self, obj):
         return obj.status.name
     status_name.short_description = 'Status'
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(DocumentAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+        sidebar += ['<a href="%s">Record</a>' % record_url]
+        account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
+        sidebar += ['<a href="%s">Account</a>' % account_url]
+        facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')#, kwargs={'document_id': obj.id})
+        sidebar += ['<a href="%s?document=%s">Facts</a>' % (facts_url, obj.id)]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
+
 admin.site.register(indivo_models.Document, DocumentAdmin)
 #-------------------------------------------------------------------------
 class StatusAdmin(DefaultModelAdmin):
@@ -107,7 +134,6 @@ class PHAAdmin(DefaultModelAdmin):
 admin.site.register(indivo_models.PHA, PHAAdmin)
 #-------------------------------------------------------------------------
 class AuditAdmin(DefaultModelAdmin):
-    # TODO: Record ID is not linked
     list_display = ('view_func', 'pha_id', 'datetime', 'effective_principal_email', 'record_id', 'document_id')
     list_filter = ('view_func', 'pha_id', 'record_id')
     exclude = ('record_id', 'document_id')
@@ -131,7 +157,7 @@ class AuditAdmin(DefaultModelAdmin):
             url = urlresolvers.reverse('admin:indivo_document_change', args=(obj.document_id,))
             return '<a href="%s">%s</a>' % (url, obj.document_id)
         else:
-            "no document"
+            return "no document"
     document_id_url.allow_tags = True
     document_id_url.short_description = 'Document'
     def has_delete_permission(self, request, obj=None):
@@ -139,6 +165,47 @@ class AuditAdmin(DefaultModelAdmin):
 
 admin.site.register(indivo_models.Audit, AuditAdmin)
 
+#-------------------------------------------------------------------------
+class EncounterAdmin(DefaultModelAdmin):
+    list_display = ('startDate', 'endDate', 'facility_name', 'get_provider_name', 'encounterType_title')
+    list_filter = ('facility_name', 'encounterType_title')
+    exclude = ('id',)
+    readonly_fields = 'fact_url',
+    def get_provider_name(self, obj):
+        parts = [field for field in [ obj.provider_name_prefix, obj.provider_name_given,
+                obj.provider_name_middle, obj.provider_name_family, obj.provider_name_suffix] if field]
+        return ''.join(parts)
+    get_provider_name.short_description = 'Provider'
+
+    def fact_url(self, obj):
+        if obj.id:
+            url = urlresolvers.reverse('admin:indivo_fact_change', args=(obj.id,))
+            return '<a href="%s">Fact: %s</a>' % (url, obj.id)
+        else:
+            return "no record"
+    fact_url.allow_tags = True
+    fact_url.short_description = 'Fact'
+
+admin.site.register(indivo_models.Encounter, EncounterAdmin)
+#-------------------------------------------------------------------------
+
+class FactAdminForm(forms.ModelForm):
+    record = RecordField(queryset=indivo_models.Record.objects.all()) 
+    class Meta:
+          model = coding_models.CodedValue
+
+class FactAdmin(DefaultModelAdmin):
+    readonly_fields = 'id','created_at'
+    list_display = ('created_at', 'get_document_name', 'get_record_name')
+    def get_record_name(self, obj):
+        return obj.record.label
+    get_record_name.short_description = 'Record'
+    def get_document_name(self, obj):
+        return '%s (%s)' % (obj.document.fqn, obj.document.id)
+    get_document_name.short_description = 'Document'
+    form = FactAdminForm
+
+admin.site.register(indivo_models.Fact, FactAdmin)
 #--[ non-customised models ]----------------------------------------------
 admin.site.register(indivo_models.AccessToken, DefaultModelAdmin)
 admin.site.register(indivo_models.AccountAuthSystem, DefaultModelAdmin)
@@ -153,9 +220,7 @@ admin.site.register(indivo_models.CarenetDocument, DefaultModelAdmin)
 admin.site.register(indivo_models.CarenetPHA, DefaultModelAdmin)
 admin.site.register(indivo_models.DocumentRels, DefaultModelAdmin)
 admin.site.register(indivo_models.DocumentStatusHistory, DefaultModelAdmin)
-admin.site.register(indivo_models.Encounter, DefaultModelAdmin)
 admin.site.register(indivo_models.Equipment, DefaultModelAdmin)
-admin.site.register(indivo_models.Fact, DefaultModelAdmin)
 admin.site.register(indivo_models.Fill, DefaultModelAdmin)
 admin.site.register(indivo_models.Immunization, DefaultModelAdmin)
 admin.site.register(indivo_models.LabResult, DefaultModelAdmin)
@@ -183,11 +248,6 @@ admin.site.register(indivo_models.VitalSigns, DefaultModelAdmin)
 class CodingSystemAdmin(DefaultModelAdmin):
     list_display = ('short_name', 'description')
 admin.site.register(coding_models.CodingSystem, CodingSystemAdmin)
-
-class SystemField(forms.ModelChoiceField):
-    def label_from_instance(self, obj):
-        return obj.short_name
-
 
 class CodedValueAdminForm(forms.ModelForm):
     system = SystemField(queryset=coding_models.CodingSystem.objects.all()) 
