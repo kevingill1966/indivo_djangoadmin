@@ -1,12 +1,17 @@
 import urllib
+import os, os.path
+
 from django.contrib import admin
 from django.core import urlresolvers
 from django import forms
+from django.utils.html import escape
 
 from admin_enhancer.admin import EnhancedModelAdminMixin
 
 from indivo_server.indivo import models as indivo_models
 from indivo_server.codingsystems import models as coding_models
+
+from settings import CORE_SCHEMA_DIRS, CONTRIB_SCHEMA_DIRS
 
 DEVELOPMENT_MODE = True
 
@@ -85,6 +90,23 @@ class RecordAdmin(DefaultModelAdmin):
         sidebar += ['<a href="%s?record__id__exact=%s">Carenets</a>' % (carenet_url, obj.id)]
         document_url = urlresolvers.reverse('admin:indivo_document_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Documents</a>' % (document_url, obj.id)]
+        sidebar += ["<h3>Facts</h3>"]
+        allergy_url = urlresolvers.reverse('admin:indivo_allergy_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Allergys</a>' % (allergy_url, obj.id)]
+        immunization_url = urlresolvers.reverse('admin:indivo_immunization_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Immunizations</a>' % (immunization_url, obj.id)]
+        labresult_url = urlresolvers.reverse('admin:indivo_labresult_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Lab Results</a>' % (labresult_url, obj.id)]
+        measurement_url = urlresolvers.reverse('admin:indivo_measurement_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Measurements</a>' % (measurement_url, obj.id)]
+        medication_url = urlresolvers.reverse('admin:indivo_medication_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Medications</a>' % (medication_url, obj.id)]
+        procedure_url = urlresolvers.reverse('admin:indivo_procedure_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Procedures</a>' % (procedure_url, obj.id)]
+        simpleclinicalnote_url = urlresolvers.reverse('admin:indivo_simpleclinicalnote_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Simple Clinical Notes</a>' % (simpleclinicalnote_url, obj.id)]
+        vitalsigns_url = urlresolvers.reverse('admin:indivo_vitalsigns_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Vital Signs</a>' % (vitalsigns_url, obj.id)]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -162,7 +184,40 @@ admin.site.register(indivo_models.StatusName, StatusAdmin)
 #-------------------------------------------------------------------------
 class DocumentSchemaAdmin(DefaultModelAdmin):
     list_display = ('type', 'id', 'stylesheet')
-    readonly_fields = 'id',
+    readonly_fields = 'id', 'schemafile', 'transformfile'
+
+    def schemafile(self, obj):
+        # I have to read the schema file directly, as it may be invalid
+        # and not visible via the document_processing api
+        # Unfortunately, the directory name cannot be relied on. simpleclinicalnote
+        # is in the folder simple note. I am not parsing the documents, so I might
+        # be picking up text in another document
+        filename = obj.type.split("#")[1]
+        for root in CONTRIB_SCHEMA_DIRS + CORE_SCHEMA_DIRS:
+            for dirname in [d for d in os.listdir(root) if os.path.exists(root+os.sep+d+os.sep+"schema.xsd")]:
+                fullpath = root + os.sep + dirname + os.sep + "schema.xsd"
+                document = open(fullpath).read()
+                if document.find(filename) == -1:
+                    continue
+                return "<b>%s</b><pre><br/>" % fullpath + escape(document) + "</pre>"
+        return "SCHEMA NO FOUND IN %s" % (CONTRIB_SCHEMA_DIRS+CORE_SCHEMA_DIRS)
+    schemafile.allow_tags = True
+    schemafile.short_description = 'Schema (XSD)'
+
+    def transformfile(self, obj):
+        # I have to read the schema file directly, as it may be invalid
+        # and not visible via the document_processing api
+        filename = obj.type.split("#")[1]
+        for root in CONTRIB_SCHEMA_DIRS + CORE_SCHEMA_DIRS:
+            for dirname in [d for d in os.listdir(root) if os.path.exists(root+os.sep+d+os.sep+"transform.xsl")]:
+                fullpath = root + os.sep + dirname + os.sep + "transform.xsl"
+                document = open(fullpath).read()
+                if document.find(filename) == -1:
+                    continue
+                return "<b>%s</b><pre><br/>" % fullpath + escape(document) + "</pre>"
+        return "SCHEMA TRANSFORM FOUND IN %s" % (CONTRIB_SCHEMA_DIRS+CORE_SCHEMA_DIRS)
+    transformfile.allow_tags = True
+    transformfile.short_description = 'Transform (XSL)'
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(DocumentSchemaAdmin, self).get_form(request, obj, **kwargs)
@@ -296,7 +351,9 @@ class CarenetAccountModelAdmin(DefaultModelAdmin):
 admin.site.register(indivo_models.CarenetAccount, CarenetAccountModelAdmin)
 
 #--[ non-customised FACT models ]----------------------------------------------
-admin.site.register(indivo_models.Allergy, DefaultModelAdmin)
+class AllergyModelAdmin(DefaultModelAdmin):
+    list_display = ('id', 'record', 'category_title')
+admin.site.register(indivo_models.Allergy, AllergyModelAdmin)
 admin.site.register(indivo_models.AllergyExclusion, DefaultModelAdmin)
 admin.site.register(indivo_models.Fill, DefaultModelAdmin)
 admin.site.register(indivo_models.Immunization, DefaultModelAdmin)
