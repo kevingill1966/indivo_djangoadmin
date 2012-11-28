@@ -1,3 +1,4 @@
+import urllib
 from django.contrib import admin
 from django.core import urlresolvers
 from django import forms
@@ -40,18 +41,27 @@ class AccountAdmin(DefaultModelAdmin):
         'failed_login_count')
 
     if DEVELOPMENT_MODE:
+        # TODO: if supervisor
         fields = ('primary_secret', 'secondary_secret') + fields
 
     list_display = ('full_name', 'contact_email', 'state')
     search_fields = ('full_name', 'contact_email')
 
-    def sidebar(self):
-        import pdb; pdb.set_trace()
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(AccountAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        record_url = urlresolvers.reverse('admin:indivo_record_changelist')
+        sidebar += ['<a href="%s?owner__id__exact=%s">Records</a>' % (record_url, obj.id)]
+        carenet_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
+        sidebar += ['<a href="%s?account=%s">Carenets</a>' % (carenet_url, obj.id)]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
 
 admin.site.register(indivo_models.Account, AccountAdmin)
 #-------------------------------------------------------------------------
 class RecordAdmin(DefaultModelAdmin):
-    list_display = ('label', 'external_id')
+    list_display = ('label', 'external_id', 'owner')
     search_fields = ('label',)
     readonly_fields = 'show_demographics_url', 'id'
     exclude='demographics',
@@ -62,6 +72,21 @@ class RecordAdmin(DefaultModelAdmin):
 
     show_demographics_url.allow_tags = True
     show_demographics_url.short_description = 'Demographics'
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(RecordAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.owner.id,))
+        sidebar += ['<a href="%s">Account</a>' % account_url]
+        demographics_url = urlresolvers.reverse('admin:indivo_demographics_change', args=(obj.demographics.id,))
+        sidebar += ['<a href="%s">Demographics</a>' % demographics_url]
+        carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Carenets</a>' % (carenet_url, obj.id)]
+        document_url = urlresolvers.reverse('admin:indivo_document_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Documents</a>' % (document_url, obj.id)]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
 
 admin.site.register(indivo_models.Record, RecordAdmin)
 #-------------------------------------------------------------------------
@@ -78,6 +103,15 @@ class DemographicsAdmin(DefaultModelAdmin):
     document_url.allow_tags = True
     document_url.short_description = 'Document'
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(DemographicsAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+        sidebar += ['<a href="%s">Record</a>' % record_url]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
+
 admin.site.register(indivo_models.Demographics, DemographicsAdmin)
 
 #-------------------------------------------------------------------------
@@ -89,7 +123,7 @@ class DocumentAdminForm(forms.ModelForm):
           model = indivo_models.Document
 
 class DocumentAdmin(DefaultModelAdmin):
-    list_display = ('id', 'fqn', 'status_name')
+    list_display = ('id', 'fqn', 'status_name', 'record', 'created_at', 'suppressed_at')
     readonly_fields = 'id',
     form = DocumentAdminForm
 
@@ -105,20 +139,40 @@ class DocumentAdmin(DefaultModelAdmin):
         sidebar += ['<a href="%s">Record</a>' % record_url]
         account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
         sidebar += ['<a href="%s">Account</a>' % account_url]
-        facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')#, kwargs={'document_id': obj.id})
+        facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')
         sidebar += ['<a href="%s?document=%s">Facts</a>' % (facts_url, obj.id)]
+        schema_url = urlresolvers.reverse('admin:indivo_documentschema_changelist')
+        sidebar += ['<a href="%s?type=%s">Schema</a>' % (schema_url, urllib.quote(obj.fqn))]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
 admin.site.register(indivo_models.Document, DocumentAdmin)
+#-------------------------------------------------------------------------
+class DocumentStatusAdminForm(forms.ModelForm):
+    status = StatusField(queryset=indivo_models.StatusName.objects.all()) 
+    class Meta:
+          model = indivo_models.DocumentStatusHistory
+class DocumentStatusModelAdmin(DefaultModelAdmin):
+    form = DocumentStatusAdminForm
+admin.site.register(indivo_models.DocumentStatusHistory, DocumentStatusModelAdmin)
 #-------------------------------------------------------------------------
 class StatusAdmin(DefaultModelAdmin):
     list_display = ('name', 'id')
 admin.site.register(indivo_models.StatusName, StatusAdmin)
 #-------------------------------------------------------------------------
 class DocumentSchemaAdmin(DefaultModelAdmin):
-    list_display = ('type', 'id')
+    list_display = ('type', 'id', 'stylesheet')
     readonly_fields = 'id',
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(DocumentSchemaAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        document_url = urlresolvers.reverse('admin:indivo_document_changelist')
+        sidebar += ['<a href="%s?fqn=%s">Documents</a>' % (document_url, urllib.quote(obj.type))]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
+
 admin.site.register(indivo_models.DocumentSchema, DocumentSchemaAdmin)
 #-------------------------------------------------------------------------
 # This is configured via a django management command. Prevent editing via admin.
@@ -206,43 +260,78 @@ class FactAdmin(DefaultModelAdmin):
     form = FactAdminForm
 
 admin.site.register(indivo_models.Fact, FactAdmin)
-#--[ non-customised models ]----------------------------------------------
-admin.site.register(indivo_models.AccessToken, DefaultModelAdmin)
-admin.site.register(indivo_models.AccountAuthSystem, DefaultModelAdmin)
-admin.site.register(indivo_models.AccountFullShare, DefaultModelAdmin)
+#-------------------------------------------------------------------------
+class CarenetModelAdmin(DefaultModelAdmin):
+    list_display = ('id', 'name', 'record')
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(CarenetModelAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+        sidebar += ['<a href="%s">Record</a>' % record_url]
+        carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Sibling Carenets</a>' % (carenet_url, obj.record.id)]
+        carenet_accounts_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
+        sidebar += ['<a href="%s?carenet__id__exact=%s">Subscribed Accounts</a>' % (carenet_accounts_url, obj.id)]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
+
+admin.site.register(indivo_models.Carenet, CarenetModelAdmin)
+#-------------------------------------------------------------------------
+class CarenetAccountModelAdmin(DefaultModelAdmin):
+    list_display = ('id', 'carenet', 'account')
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(CarenetAccountModelAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        carenet_url = urlresolvers.reverse('admin:indivo_carenet_change', args=(obj.carenet.id,))
+        sidebar += ['<a href="%s">Carenet</a>' % carenet_url]
+        account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.account.id,))
+        sidebar += ['<a href="%s">Account</a>' % account_url]
+        form.sidebar = "<br/>".join(sidebar)
+        return form
+
+admin.site.register(indivo_models.CarenetAccount, CarenetAccountModelAdmin)
+
+#--[ non-customised FACT models ]----------------------------------------------
 admin.site.register(indivo_models.Allergy, DefaultModelAdmin)
 admin.site.register(indivo_models.AllergyExclusion, DefaultModelAdmin)
+admin.site.register(indivo_models.Fill, DefaultModelAdmin)
+admin.site.register(indivo_models.Immunization, DefaultModelAdmin)
+admin.site.register(indivo_models.LabResult, DefaultModelAdmin)
+admin.site.register(indivo_models.Measurement, DefaultModelAdmin)
+admin.site.register(indivo_models.Medication, DefaultModelAdmin)
+admin.site.register(indivo_models.Problem, DefaultModelAdmin)
+admin.site.register(indivo_models.Procedure, DefaultModelAdmin)
+admin.site.register(indivo_models.SimpleClinicalNote, DefaultModelAdmin)
+admin.site.register(indivo_models.VitalSigns, DefaultModelAdmin)
+
+#--[ non-customised models ]----------------------------------------------
+admin.site.register(indivo_models.AccountAuthSystem, DefaultModelAdmin)
+admin.site.register(indivo_models.AccountFullShare, DefaultModelAdmin)
 admin.site.register(indivo_models.AuthSystem, DefaultModelAdmin)
-admin.site.register(indivo_models.Carenet, DefaultModelAdmin)
-admin.site.register(indivo_models.CarenetAccount, DefaultModelAdmin)
 admin.site.register(indivo_models.CarenetAutoshare, DefaultModelAdmin)
 admin.site.register(indivo_models.CarenetDocument, DefaultModelAdmin)
 admin.site.register(indivo_models.CarenetPHA, DefaultModelAdmin)
 admin.site.register(indivo_models.DocumentRels, DefaultModelAdmin)
-admin.site.register(indivo_models.DocumentStatusHistory, DefaultModelAdmin)
 admin.site.register(indivo_models.Equipment, DefaultModelAdmin)
-admin.site.register(indivo_models.Fill, DefaultModelAdmin)
-admin.site.register(indivo_models.Immunization, DefaultModelAdmin)
-admin.site.register(indivo_models.LabResult, DefaultModelAdmin)
 admin.site.register(indivo_models.MachineApp, DefaultModelAdmin)
-admin.site.register(indivo_models.Measurement, DefaultModelAdmin)
-admin.site.register(indivo_models.Medication, DefaultModelAdmin)
 admin.site.register(indivo_models.Message, DefaultModelAdmin)
 admin.site.register(indivo_models.MessageAttachment, DefaultModelAdmin)
-admin.site.register(indivo_models.Nonce, DefaultModelAdmin)
 admin.site.register(indivo_models.Notification, DefaultModelAdmin)
 admin.site.register(indivo_models.NoUser, DefaultModelAdmin)
 admin.site.register(indivo_models.PHAShare, DefaultModelAdmin)
 admin.site.register(indivo_models.Principal, DefaultModelAdmin)
-admin.site.register(indivo_models.Problem, DefaultModelAdmin)
-admin.site.register(indivo_models.Procedure, DefaultModelAdmin)
 admin.site.register(indivo_models.RecordNotificationRoute, DefaultModelAdmin)
+
+#--------[ Session Stuff ]--------------------------------------
+admin.site.register(indivo_models.AccessToken, DefaultModelAdmin)
+admin.site.register(indivo_models.Nonce, DefaultModelAdmin)
 admin.site.register(indivo_models.ReqToken, DefaultModelAdmin)
 admin.site.register(indivo_models.SessionRequestToken, DefaultModelAdmin)
 admin.site.register(indivo_models.SessionToken, DefaultModelAdmin)
-admin.site.register(indivo_models.SimpleClinicalNote, DefaultModelAdmin)
-admin.site.register(indivo_models.VitalSigns, DefaultModelAdmin)
-
 #--------[ Coding Systems ]--------------------------------------
 
 class CodingSystemAdmin(DefaultModelAdmin):
