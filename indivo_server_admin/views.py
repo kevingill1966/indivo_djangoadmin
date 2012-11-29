@@ -1,17 +1,20 @@
 
 from django import forms
 from django.shortcuts import render
+from django.contrib.admin.views.decorators import staff_member_required
 
 from indivo_server.indivo import models as indivo_models
-
 
 class ImportForm(forms.Form):
     record_id = forms.CharField(max_length=100)
     document = forms.FileField()
 
 # This is a simple form for importing an XML file. It is published via the Admin
-# site for testing purposes. TODO: Security
+# site for testing purposes. 
+@staff_member_required
 def import_document(request):
+    assert request.user.is_superuser, "Super-user permissions required"
+
     if request.method == 'POST':
         form = ImportForm(request.POST, request.FILES)
         if form.is_valid():
