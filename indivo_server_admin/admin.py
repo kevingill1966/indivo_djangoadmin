@@ -57,10 +57,11 @@ class AccountAdmin(DefaultModelAdmin):
         form = super(AccountAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        record_url = urlresolvers.reverse('admin:indivo_record_changelist')
-        sidebar += ['<a href="%s?owner__id__exact=%s">Records</a>' % (record_url, obj.id)]
-        carenet_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
-        sidebar += ['<a href="%s?account=%s">Carenets</a>' % (carenet_url, obj.id)]
+        if obj:
+            record_url = urlresolvers.reverse('admin:indivo_record_changelist')
+            sidebar += ['<a href="%s?owner__id__exact=%s">Records</a>' % (record_url, obj.id)]
+            carenet_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
+            sidebar += ['<a href="%s?account=%s">Carenets</a>' % (carenet_url, obj.id)]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -88,41 +89,44 @@ class RecordAdmin(DefaultModelAdmin):
         form = super(RecordAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.owner.id,))
-        sidebar += ['<a href="%s">Account</a>' % account_url]
-        demographics_url = urlresolvers.reverse('admin:indivo_demographics_change', args=(obj.demographics.id,))
-        sidebar += ['<a href="%s">Demographics</a>' % demographics_url]
-        carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Carenets</a>' % (carenet_url, obj.id)]
-        document_url = urlresolvers.reverse('admin:indivo_document_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Documents</a>' % (document_url, obj.id)]
+        if obj:
+            account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.owner.id,))
+            sidebar += ['<a href="%s">Account</a>' % account_url]
+            if obj.demographics:
+                demographics_url = urlresolvers.reverse('admin:indivo_demographics_change', args=(obj.demographics.id,))
+                sidebar += ['<a href="%s">Demographics</a>' % demographics_url]
+            carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Carenets</a>' % (carenet_url, obj.id)]
+            document_url = urlresolvers.reverse('admin:indivo_document_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Documents</a>' % (document_url, obj.id)]
 
-        allergy_url = urlresolvers.reverse('admin:indivo_allergy_changelist')
-        sidebar += ['<h3>Medical Record</h3><a href="%s?record__id__exact=%s">Allergys</a>' % (allergy_url, obj.id)]
-        allergyexclusion_url = urlresolvers.reverse('admin:indivo_allergyexclusion_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Allergys Exclusions</a>' % (allergyexclusion_url, obj.id)]
-        encounter_url = urlresolvers.reverse('admin:indivo_encounter_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Encounters</a>' % (encounter_url, obj.id)]
-        equipment_url = urlresolvers.reverse('admin:indivo_equipment_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Equipment</a>' % (equipment_url, obj.id)]
-        immunization_url = urlresolvers.reverse('admin:indivo_immunization_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Immunizations</a>' % (immunization_url, obj.id)]
-        labresult_url = urlresolvers.reverse('admin:indivo_labresult_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Lab Results</a>' % (labresult_url, obj.id)]
-        measurement_url = urlresolvers.reverse('admin:indivo_measurement_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Measurements</a>' % (measurement_url, obj.id)]
-        medication_url = urlresolvers.reverse('admin:indivo_medication_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Medications</a>' % (medication_url, obj.id)]
-        fill_url = urlresolvers.reverse('admin:indivo_fill_changelist')
-        sidebar += ['&nbsp;&nbsp;<a href="%s?record__id__exact=%s">Fills</a>' % (fill_url, obj.id)]
-        problem_url = urlresolvers.reverse('admin:indivo_problem_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Problems</a>' % (problem_url, obj.id)]
-        procedure_url = urlresolvers.reverse('admin:indivo_procedure_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Procedures</a>' % (procedure_url, obj.id)]
-        simpleclinicalnote_url = urlresolvers.reverse('admin:indivo_simpleclinicalnote_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Simple Clinical Notes</a>' % (simpleclinicalnote_url, obj.id)]
-        vitalsigns_url = urlresolvers.reverse('admin:indivo_vitalsigns_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Vital Signs</a>' % (vitalsigns_url, obj.id)]
+            allergy_url = urlresolvers.reverse('admin:indivo_allergy_changelist')
+            sidebar += ['<h3>Medical Record</h3><a href="%s?record__id__exact=%s">Allergys</a>' % (allergy_url, obj.id)]
+            allergyexclusion_url = urlresolvers.reverse('admin:indivo_allergyexclusion_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Allergys Exclusions</a>' % (allergyexclusion_url, obj.id)]
+            encounter_url = urlresolvers.reverse('admin:indivo_encounter_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Encounters</a>' % (encounter_url, obj.id)]
+            equipment_url = urlresolvers.reverse('admin:indivo_equipment_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Equipment</a>' % (equipment_url, obj.id)]
+            immunization_url = urlresolvers.reverse('admin:indivo_immunization_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Immunizations</a>' % (immunization_url, obj.id)]
+            labresult_url = urlresolvers.reverse('admin:indivo_labresult_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Lab Results</a>' % (labresult_url, obj.id)]
+            measurement_url = urlresolvers.reverse('admin:indivo_measurement_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Measurements</a>' % (measurement_url, obj.id)]
+            medication_url = urlresolvers.reverse('admin:indivo_medication_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Medications</a>' % (medication_url, obj.id)]
+            fill_url = urlresolvers.reverse('admin:indivo_fill_changelist')
+            sidebar += ['&nbsp;&nbsp;<a href="%s?record__id__exact=%s">Fills</a>' % (fill_url, obj.id)]
+            problem_url = urlresolvers.reverse('admin:indivo_problem_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Problems</a>' % (problem_url, obj.id)]
+            procedure_url = urlresolvers.reverse('admin:indivo_procedure_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Procedures</a>' % (procedure_url, obj.id)]
+            simpleclinicalnote_url = urlresolvers.reverse('admin:indivo_simpleclinicalnote_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Simple Clinical Notes</a>' % (simpleclinicalnote_url, obj.id)]
+            vitalsigns_url = urlresolvers.reverse('admin:indivo_vitalsigns_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Vital Signs</a>' % (vitalsigns_url, obj.id)]
+
         form.sidebar = '<br/>'.join(sidebar)
         return form
 
@@ -145,8 +149,9 @@ class DemographicsAdmin(DefaultModelAdmin):
         form = super(DemographicsAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
-        sidebar += ['<a href="%s">Record</a>' % record_url]
+        if obj:
+            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+            sidebar += ['<a href="%s">Record</a>' % record_url]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -173,15 +178,16 @@ class DocumentAdmin(DefaultModelAdmin):
         form = super(DocumentAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
-        sidebar += ['<a href="%s">Record</a>' % record_url]
-        account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
-        sidebar += ['<a href="%s">Account</a>' % account_url]
-        facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')
-        sidebar += ['<a href="%s?document=%s">Facts</a>' % (facts_url, obj.id)]
-        if obj.fqn:
-            schema_url = urlresolvers.reverse('admin:indivo_documentschema_changelist')
-            sidebar += ['<a href="%s?type=%s">Schema</a>' % (schema_url, urllib.quote(obj.fqn))]
+        if obj:
+            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+            sidebar += ['<a href="%s">Record</a>' % record_url]
+            account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
+            sidebar += ['<a href="%s">Account</a>' % account_url]
+            facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')
+            sidebar += ['<a href="%s?document=%s">Facts</a>' % (facts_url, obj.id)]
+            if obj.fqn:
+                schema_url = urlresolvers.reverse('admin:indivo_documentschema_changelist')
+                sidebar += ['<a href="%s?type=%s">Schema</a>' % (schema_url, urllib.quote(obj.fqn))]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -247,8 +253,9 @@ class DocumentSchemaAdmin(DefaultModelAdmin):
         form = super(DocumentSchemaAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        document_url = urlresolvers.reverse('admin:indivo_document_changelist')
-        sidebar += ['<a href="%s?fqn=%s">Documents</a>' % (document_url, urllib.quote(obj.type))]
+        if obj:
+            document_url = urlresolvers.reverse('admin:indivo_document_changelist')
+            sidebar += ['<a href="%s?fqn=%s">Documents</a>' % (document_url, urllib.quote(obj.type))]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -323,12 +330,13 @@ class CarenetModelAdmin(DefaultModelAdmin):
         form = super(CarenetModelAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
-        sidebar += ['<a href="%s">Record</a>' % record_url]
-        carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Sibling Carenets</a>' % (carenet_url, obj.record.id)]
-        carenet_accounts_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
-        sidebar += ['<a href="%s?carenet__id__exact=%s">Subscribed Accounts</a>' % (carenet_accounts_url, obj.id)]
+        if obj:
+            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+            sidebar += ['<a href="%s">Record</a>' % record_url]
+            carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
+            sidebar += ['<a href="%s?record__id__exact=%s">Sibling Carenets</a>' % (carenet_url, obj.record.id)]
+            carenet_accounts_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
+            sidebar += ['<a href="%s?carenet__id__exact=%s">Subscribed Accounts</a>' % (carenet_accounts_url, obj.id)]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -341,10 +349,11 @@ class CarenetAccountModelAdmin(DefaultModelAdmin):
         form = super(CarenetAccountModelAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        carenet_url = urlresolvers.reverse('admin:indivo_carenet_change', args=(obj.carenet.id,))
-        sidebar += ['<a href="%s">Carenet</a>' % carenet_url]
-        account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.account.id,))
-        sidebar += ['<a href="%s">Account</a>' % account_url]
+        if obj:
+            carenet_url = urlresolvers.reverse('admin:indivo_carenet_change', args=(obj.carenet.id,))
+            sidebar += ['<a href="%s">Carenet</a>' % carenet_url]
+            account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.account.id,))
+            sidebar += ['<a href="%s">Account</a>' % account_url]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
