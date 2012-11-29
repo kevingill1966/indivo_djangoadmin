@@ -149,7 +149,7 @@ class DemographicsAdmin(DefaultModelAdmin):
         form = super(DemographicsAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
-        if obj:
+        if obj and obj.record:
             record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
             sidebar += ['<a href="%s">Record</a>' % record_url]
         form.sidebar = "<br/>".join(sidebar)
@@ -179,10 +179,11 @@ class DocumentAdmin(DefaultModelAdmin):
         form.sidebar_name = "Links"
         sidebar = []
         if obj:
-            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
-            sidebar += ['<a href="%s">Record</a>' % record_url]
-            account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
-            sidebar += ['<a href="%s">Account</a>' % account_url]
+            if obj.record:
+                record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+                sidebar += ['<a href="%s">Record</a>' % record_url]
+                account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
+                sidebar += ['<a href="%s">Account</a>' % account_url]
             facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')
             sidebar += ['<a href="%s?document=%s">Facts</a>' % (facts_url, obj.id)]
             if obj.fqn:
@@ -314,7 +315,8 @@ class FactAdmin(DefaultModelAdmin):
     readonly_fields = 'id','created_at'
     list_display = ('created_at', 'get_document_name', 'get_record_name')
     def get_record_name(self, obj):
-        return obj.record.label
+        if obj.record:
+            return obj.record.label
     get_record_name.short_description = 'Record'
     def get_document_name(self, obj):
         return '%s (%s)' % (obj.document.fqn, obj.document.id)
@@ -331,10 +333,11 @@ class CarenetModelAdmin(DefaultModelAdmin):
         form.sidebar_name = "Links"
         sidebar = []
         if obj:
-            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
-            sidebar += ['<a href="%s">Record</a>' % record_url]
-            carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
-            sidebar += ['<a href="%s?record__id__exact=%s">Sibling Carenets</a>' % (carenet_url, obj.record.id)]
+            if obj.record:
+                record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+                sidebar += ['<a href="%s">Record</a>' % record_url]
+                carenet_url = urlresolvers.reverse('admin:indivo_carenet_changelist')
+                sidebar += ['<a href="%s?record__id__exact=%s">Sibling Carenets</a>' % (carenet_url, obj.record.id)]
             carenet_accounts_url = urlresolvers.reverse('admin:indivo_carenetaccount_changelist')
             sidebar += ['<a href="%s?carenet__id__exact=%s">Subscribed Accounts</a>' % (carenet_accounts_url, obj.id)]
         form.sidebar = "<br/>".join(sidebar)
@@ -363,18 +366,20 @@ admin.site.register(indivo_models.CarenetAccount, CarenetAccountModelAdmin)
 class FactModelAdmin(DefaultModelAdmin):
     list_display = ('created_at', 'id', 'record', 'get_record_name')
     def get_record_name(self, obj):
-        return obj.record.label
-    get_record_name.short_description = 'Record'
+        if obj.record:
+            return obj.record.label
+    get_record_name.short_description = 'Record Name'
 
     def get_form(self, request, obj=None, **kwargs):
         form = super(FactModelAdmin, self).get_form(request, obj, **kwargs)
         form.sidebar_name = "Links"
         sidebar = []
         if obj:
-            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
-            sidebar += ['<a href="%s">Record</a>' % record_url]
-            account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
-            sidebar += ['<a href="%s">Account</a>' % account_url]
+            if obj.record:
+                record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+                sidebar += ['<a href="%s">Record</a>' % record_url]
+                account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
+                sidebar += ['<a href="%s">Account</a>' % account_url]
             if obj.document_id:
                 url = urlresolvers.reverse('admin:indivo_document_change', args=(obj.document_id,))
                 sidebar += ['<a href="%s">Document</a>' % url]
