@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.core import urlresolvers
 from django import forms
 from django.utils.html import escape
+from django.conf.urls.defaults import patterns
 
 from admin_enhancer.admin import EnhancedModelAdminMixin
 
@@ -65,11 +66,16 @@ class AccountAdmin(DefaultModelAdmin):
 
 admin.site.register(indivo_models.Account, AccountAdmin)
 #-------------------------------------------------------------------------
+class RecordAdminForm(forms.ModelForm):
+    class Meta:
+          model = indivo_models.Record
+
 class RecordAdmin(DefaultModelAdmin):
     list_display = ('label', 'external_id', 'owner')
     search_fields = ('label',)
     readonly_fields = 'show_demographics_url', 'id'
     exclude='demographics',
+    change_form_template = "admin/indivo/change_form_record.html"
 
     def show_demographics_url(self, obj):
         demographics_url = urlresolvers.reverse('admin:indivo_demographics_change', args=(obj.demographics.id,))
@@ -90,9 +96,15 @@ class RecordAdmin(DefaultModelAdmin):
         sidebar += ['<a href="%s?record__id__exact=%s">Carenets</a>' % (carenet_url, obj.id)]
         document_url = urlresolvers.reverse('admin:indivo_document_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Documents</a>' % (document_url, obj.id)]
-        sidebar += ["<h3>Facts</h3>"]
+
         allergy_url = urlresolvers.reverse('admin:indivo_allergy_changelist')
-        sidebar += ['<a href="%s?record__id__exact=%s">Allergys</a>' % (allergy_url, obj.id)]
+        sidebar += ['<h3>Medical Record</h3><a href="%s?record__id__exact=%s">Allergys</a>' % (allergy_url, obj.id)]
+        allergyexclusion_url = urlresolvers.reverse('admin:indivo_allergyexclusion_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Allergys Exclusions</a>' % (allergyexclusion_url, obj.id)]
+        encounter_url = urlresolvers.reverse('admin:indivo_encounter_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Encounters</a>' % (encounter_url, obj.id)]
+        equipment_url = urlresolvers.reverse('admin:indivo_equipment_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Equipment</a>' % (equipment_url, obj.id)]
         immunization_url = urlresolvers.reverse('admin:indivo_immunization_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Immunizations</a>' % (immunization_url, obj.id)]
         labresult_url = urlresolvers.reverse('admin:indivo_labresult_changelist')
@@ -101,13 +113,17 @@ class RecordAdmin(DefaultModelAdmin):
         sidebar += ['<a href="%s?record__id__exact=%s">Measurements</a>' % (measurement_url, obj.id)]
         medication_url = urlresolvers.reverse('admin:indivo_medication_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Medications</a>' % (medication_url, obj.id)]
+        fill_url = urlresolvers.reverse('admin:indivo_fill_changelist')
+        sidebar += ['&nbsp;&nbsp;<a href="%s?record__id__exact=%s">Fills</a>' % (fill_url, obj.id)]
+        problem_url = urlresolvers.reverse('admin:indivo_problem_changelist')
+        sidebar += ['<a href="%s?record__id__exact=%s">Problems</a>' % (problem_url, obj.id)]
         procedure_url = urlresolvers.reverse('admin:indivo_procedure_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Procedures</a>' % (procedure_url, obj.id)]
         simpleclinicalnote_url = urlresolvers.reverse('admin:indivo_simpleclinicalnote_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Simple Clinical Notes</a>' % (simpleclinicalnote_url, obj.id)]
         vitalsigns_url = urlresolvers.reverse('admin:indivo_vitalsigns_changelist')
         sidebar += ['<a href="%s?record__id__exact=%s">Vital Signs</a>' % (vitalsigns_url, obj.id)]
-        form.sidebar = "<br/>".join(sidebar)
+        form.sidebar = '<br/>'.join(sidebar)
         return form
 
 admin.site.register(indivo_models.Record, RecordAdmin)
@@ -163,8 +179,9 @@ class DocumentAdmin(DefaultModelAdmin):
         sidebar += ['<a href="%s">Account</a>' % account_url]
         facts_url = urlresolvers.reverse('admin:indivo_fact_changelist')
         sidebar += ['<a href="%s?document=%s">Facts</a>' % (facts_url, obj.id)]
-        schema_url = urlresolvers.reverse('admin:indivo_documentschema_changelist')
-        sidebar += ['<a href="%s?type=%s">Schema</a>' % (schema_url, urllib.quote(obj.fqn))]
+        if obj.fqn:
+            schema_url = urlresolvers.reverse('admin:indivo_documentschema_changelist')
+            sidebar += ['<a href="%s?type=%s">Schema</a>' % (schema_url, urllib.quote(obj.fqn))]
         form.sidebar = "<br/>".join(sidebar)
         return form
 
@@ -197,7 +214,8 @@ class DocumentSchemaAdmin(DefaultModelAdmin):
             for dirname in [d for d in os.listdir(root) if os.path.exists(root+os.sep+d+os.sep+"schema.xsd")]:
                 fullpath = root + os.sep + dirname + os.sep + "schema.xsd"
                 document = open(fullpath).read()
-                if document.find(filename) == -1:
+                search='name="%s"' % filename
+                if document.find(search) == -1:
                     continue
                 return "<b>%s</b><pre><br/>" % fullpath + escape(document) + "</pre>"
         return "SCHEMA NO FOUND IN %s" % (CONTRIB_SCHEMA_DIRS+CORE_SCHEMA_DIRS)
@@ -209,10 +227,16 @@ class DocumentSchemaAdmin(DefaultModelAdmin):
         # and not visible via the document_processing api
         filename = obj.type.split("#")[1]
         for root in CONTRIB_SCHEMA_DIRS + CORE_SCHEMA_DIRS:
-            for dirname in [d for d in os.listdir(root) if os.path.exists(root+os.sep+d+os.sep+"transform.xsl")]:
+            for dirname in [d for d in os.listdir(root) if os.path.exists(root+os.sep+d+os.sep+"transform.xsl") or
+                os.path.exists(root+os.sep+d+os.sep+"transform.py")]:
                 fullpath = root + os.sep + dirname + os.sep + "transform.xsl"
+                if os.path.exists(fullpath):
+                    search='name="%s"' % filename
+                else:
+                    search=filename
+                    fullpath = root + os.sep + dirname + os.sep + "transform.py"
                 document = open(fullpath).read()
-                if document.find(filename) == -1:
+                if document.find(search) == -1:
                     continue
                 return "<b>%s</b><pre><br/>" % fullpath + escape(document) + "</pre>"
         return "SCHEMA TRANSFORM FOUND IN %s" % (CONTRIB_SCHEMA_DIRS+CORE_SCHEMA_DIRS)
@@ -274,30 +298,6 @@ class AuditAdmin(DefaultModelAdmin):
 
 admin.site.register(indivo_models.Audit, AuditAdmin)
 
-#-------------------------------------------------------------------------
-class EncounterAdmin(DefaultModelAdmin):
-    list_display = ('startDate', 'endDate', 'facility_name', 'get_provider_name', 'encounterType_title')
-    list_filter = ('facility_name', 'encounterType_title')
-    exclude = ('id',)
-    readonly_fields = 'fact_url',
-    def get_provider_name(self, obj):
-        parts = [field for field in [ obj.provider_name_prefix, obj.provider_name_given,
-                obj.provider_name_middle, obj.provider_name_family, obj.provider_name_suffix] if field]
-        return ''.join(parts)
-    get_provider_name.short_description = 'Provider'
-
-    def fact_url(self, obj):
-        if obj.id:
-            url = urlresolvers.reverse('admin:indivo_fact_change', args=(obj.id,))
-            return '<a href="%s">Fact: %s</a>' % (url, obj.id)
-        else:
-            return "no record"
-    fact_url.allow_tags = True
-    fact_url.short_description = 'Fact'
-
-admin.site.register(indivo_models.Encounter, EncounterAdmin)
-#-------------------------------------------------------------------------
-
 class FactAdminForm(forms.ModelForm):
     record = RecordField(queryset=indivo_models.Record.objects.all()) 
     class Meta:
@@ -350,20 +350,111 @@ class CarenetAccountModelAdmin(DefaultModelAdmin):
 
 admin.site.register(indivo_models.CarenetAccount, CarenetAccountModelAdmin)
 
-#--[ non-customised FACT models ]----------------------------------------------
-class AllergyModelAdmin(DefaultModelAdmin):
-    list_display = ('id', 'record', 'category_title')
+#--[ FACT models ]----------------------------------------------
+class FactModelAdmin(DefaultModelAdmin):
+    list_display = ('created_at', 'id', 'record', 'get_record_name')
+    def get_record_name(self, obj):
+        return obj.record.label
+    get_record_name.short_description = 'Record'
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(FactModelAdmin, self).get_form(request, obj, **kwargs)
+        form.sidebar_name = "Links"
+        sidebar = []
+        if obj:
+            record_url = urlresolvers.reverse('admin:indivo_record_change', args=(obj.record.id,))
+            sidebar += ['<a href="%s">Record</a>' % record_url]
+            account_url = urlresolvers.reverse('admin:indivo_account_change', args=(obj.record.owner.id,))
+            sidebar += ['<a href="%s">Account</a>' % account_url]
+            if obj.document_id:
+                url = urlresolvers.reverse('admin:indivo_document_change', args=(obj.document_id,))
+                sidebar += ['<a href="%s">Document</a>' % url]
+
+        form.sidebar = "<br/>".join(sidebar)
+        form.sidebar_raw = sidebar
+        return form
+
+class EncounterAdmin(FactModelAdmin):
+    list_display = ('created_at', 'startDate', 'endDate', 'facility_name', 'get_provider_name', 'encounterType_title', 'get_record_name')
+    list_filter = ('facility_name', 'encounterType_title')
+    exclude = ('id',)
+    readonly_fields = 'fact_url',
+    def get_provider_name(self, obj):
+        parts = [field for field in [ obj.provider_name_prefix, obj.provider_name_given,
+                obj.provider_name_middle, obj.provider_name_family, obj.provider_name_suffix] if field]
+        return ''.join(parts)
+    get_provider_name.short_description = 'Provider'
+
+    def fact_url(self, obj):
+        if obj.id:
+            url = urlresolvers.reverse('admin:indivo_fact_change', args=(obj.id,))
+            return '<a href="%s">Fact: %s</a>' % (url, obj.id)
+        else:
+            return "no record"
+    fact_url.allow_tags = True
+    fact_url.short_description = 'Fact'
+
+admin.site.register(indivo_models.Encounter, EncounterAdmin)
+
+
+class AllergyModelAdmin(FactModelAdmin):
+    list_display = FactModelAdmin.list_display + ('category_title',)
 admin.site.register(indivo_models.Allergy, AllergyModelAdmin)
-admin.site.register(indivo_models.AllergyExclusion, DefaultModelAdmin)
-admin.site.register(indivo_models.Fill, DefaultModelAdmin)
-admin.site.register(indivo_models.Immunization, DefaultModelAdmin)
-admin.site.register(indivo_models.LabResult, DefaultModelAdmin)
-admin.site.register(indivo_models.Measurement, DefaultModelAdmin)
-admin.site.register(indivo_models.Medication, DefaultModelAdmin)
-admin.site.register(indivo_models.Problem, DefaultModelAdmin)
-admin.site.register(indivo_models.Procedure, DefaultModelAdmin)
-admin.site.register(indivo_models.SimpleClinicalNote, DefaultModelAdmin)
-admin.site.register(indivo_models.VitalSigns, DefaultModelAdmin)
+admin.site.register(indivo_models.AllergyExclusion, FactModelAdmin)
+admin.site.register(indivo_models.Equipment, FactModelAdmin)
+class FillModelAdmin(FactModelAdmin):
+    list_display = ('date', 'get_drug_name', 'get_record_name', 'created_at')
+    def get_drug_name(self, obj):
+        return obj.medication.drugName_title
+    get_drug_name.short_description = 'Drug name'
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(FillModelAdmin, self).get_form(request, obj, **kwargs)
+        sidebar = form.sidebar_raw
+        if obj and obj.medication_id:
+            url = urlresolvers.reverse('admin:indivo_medication_change', args=(obj.medication_id,))
+            sidebar += ['<a href="%s">Medication</a>' % url]
+            url = urlresolvers.reverse('admin:indivo_fill_changelist')
+            sidebar += ['<a href="%s?medication=%s">All Fills for this Med</a>' % (url, obj.medication.id)]
+        form.sidebar = "<br/>".join(sidebar)
+        form.sidebar_raw = sidebar
+        return form
+
+admin.site.register(indivo_models.Fill, FillModelAdmin)
+class ImmunizationModelAdmin(FactModelAdmin):
+    list_display = ('date', 'product_class_title') + FactModelAdmin.list_display
+admin.site.register(indivo_models.Immunization, ImmunizationModelAdmin)
+class LabModelAdmin(FactModelAdmin):
+    list_display = ('collected_at', 'test_name_title') + FactModelAdmin.list_display 
+
+admin.site.register(indivo_models.LabResult, LabModelAdmin)
+class MeasurementModelAdmin(FactModelAdmin):
+    list_display = ('datetime', 'type') + FactModelAdmin.list_display
+admin.site.register(indivo_models.Measurement, MeasurementModelAdmin)
+class MedicationModelAdmin(FactModelAdmin):
+    list_display = ('startDate', 'endDate', 'drugName_title', 'get_record_name')
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(MedicationModelAdmin, self).get_form(request, obj, **kwargs)
+        sidebar = form.sidebar_raw
+        if obj:
+            url = urlresolvers.reverse('admin:indivo_fill_changelist')
+            sidebar += ['<a href="%s?medication=%s">Fills</a>' % (url, obj.id)]
+        form.sidebar = "<br/>".join(sidebar)
+        form.sidebar_raw = sidebar
+        return form
+
+admin.site.register(indivo_models.Medication, MedicationModelAdmin)
+class ProblemModelAdmin(FactModelAdmin):
+    list_display = ('startDate', 'endDate', 'name_title') + FactModelAdmin.list_display
+admin.site.register(indivo_models.Problem, ProblemModelAdmin)
+class ProcedureModelAdmin(FactModelAdmin):
+    list_display = ('date_performed', 'name', 'provider_name', 'provider_institution') + FactModelAdmin.list_display
+admin.site.register(indivo_models.Procedure, ProcedureModelAdmin)
+class SimpleClinicalNoteModelAdmin(FactModelAdmin):
+    list_display = ('date_of_visit', 'visit_type', 'specialty', 'provider_name', 'provider_institution', 'chief_complaint', 'get_record_name')
+admin.site.register(indivo_models.SimpleClinicalNote, SimpleClinicalNoteModelAdmin)
+class VitalSignsModelAdmin(FactModelAdmin):
+    list_display = ('date', ) + FactModelAdmin.list_display
+admin.site.register(indivo_models.VitalSigns, VitalSignsModelAdmin)
 
 #--[ non-customised models ]----------------------------------------------
 admin.site.register(indivo_models.AccountAuthSystem, DefaultModelAdmin)
@@ -373,7 +464,6 @@ admin.site.register(indivo_models.CarenetAutoshare, DefaultModelAdmin)
 admin.site.register(indivo_models.CarenetDocument, DefaultModelAdmin)
 admin.site.register(indivo_models.CarenetPHA, DefaultModelAdmin)
 admin.site.register(indivo_models.DocumentRels, DefaultModelAdmin)
-admin.site.register(indivo_models.Equipment, DefaultModelAdmin)
 admin.site.register(indivo_models.MachineApp, DefaultModelAdmin)
 admin.site.register(indivo_models.Message, DefaultModelAdmin)
 admin.site.register(indivo_models.MessageAttachment, DefaultModelAdmin)
@@ -410,3 +500,16 @@ class CodedValueAdmin(DefaultModelAdmin):
     form = CodedValueAdminForm
 admin.site.register(coding_models.CodedValue, CodedValueAdmin)
 
+#--------------------------------------------------------------------------------------
+from views import import_document
+
+def get_admin_urls(urls):
+    def get_urls():
+        my_urls = patterns('',
+            (r'^import_document/$', admin.site.admin_view(import_document))
+        )
+        return my_urls + urls
+    return get_urls
+
+admin_urls = get_admin_urls(admin.site.get_urls())
+admin.site.get_urls = admin_urls
